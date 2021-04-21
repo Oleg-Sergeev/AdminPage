@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <script src="front.mjs"></script>
+</head>
+
+<body>
+    <div id="container">
+        <div>
+                <p>
+                    <input type="file" id='ff'>
+                    <button onclick="test()">Отправить</button>
+                </p>
+            <select id="fileChooser" onchange="load(value)">
+                <option value="directions">Информация по направлениям</option>
+                <option value="questions">Вопросы</option>
+                <option value="hostels">Общежития</option>
+            </select>
+        </div>
+        <div id='titleContainer'>
+            <div class='buttons'>
+                <button onclick="createWindow('title')">
+                    Добавить
+                </button>
+                <button onclick="createWindow('title', true)">
+                    Редактировать
+                </button>
+                <button onclick="removeTitle()">
+                    Удалить
+                </button>
+            </div>
+            <select id="titleName" onchange="updateTitleData()"></select>
+            <div id='subtitleContainer'>
+                <div class='buttons'>
+                    <button onclick="createWindow('subtitle')">
+                        Добавить
+                    </button>
+                    <button onclick="createWindow('subtitle', true)">
+                        Редактировать
+                    </button>
+                    <button onclick="removeSubtitle()">
+                        Удалить
+                    </button>
+                </div>
+                <select id="subtitleName" onchange="updateSubtitleData()"></select>
+                <div id='subtitleDataContainer'>
+                    <div class='buttons'>
+                        <button onclick="createWindow('field_add')">
+                            Добавить поле
+                        </button>
+                        <button onclick="createWindow('field_delete')">
+                            Удалить поле
+                        </button>
+                    </div>
+                    <ul id='subtitleData'>
+                        <li>ЗначениеТест</li>
+                    </ul>
+                </div>
+            </div>
+            <button onclick="save(document.getElementById('fileChooser').value)">Сохранить</button>
+        </div>
+    </div>
+</body>
+
+</html>

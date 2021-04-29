@@ -1,6 +1,3 @@
-// import {toNumber} from './converters.js';
-// console.log(toNumber('122'));
-// console.log('122');
 const fields = new Map();
 
 const ID = {
@@ -9,6 +6,7 @@ const ID = {
     ulSubtitleData: 'subtitleData',
     container: 'container',
     objectForm: 'dynamic__object',
+    fileChooser: 'fileChooser',
     inputs: {
         titleName: 'titleInput',
         fieldName: 'fieldInput'
@@ -29,93 +27,81 @@ let currentSubtitle = -1;
 let currentData = {}
 
 
-async function save(fileName) {
-    const data = {
-        file: fileName,
-        value: currentData
-    }
-
+function save() {
     const type = 'data:application/octet-stream;base64, ';
     const text = JSON.stringify(currentData, null, 2);
     const base = utf8_to_b64(text);
     const res = type + base;
 
+    const fileName = document.getElementById(ID.fileChooser).files[0].name;
+
     const link = document.createElement('a');
     link.setAttribute('href', res);
-    link.setAttribute('download', 'someFile.json');
+    link.setAttribute('download', fileName);
     link.click();
-
-    // const response = await fetch('http://localhost:3000/send', {
-    //     method: 'POST',
-    //     headers: {
-    //         'Content-Type': 'application/json;charset=utf-8'
-    //     },
-    //     body: JSON.stringify(data)
-    // });
-
-    // const filePath = await response.text();
-
-    // const link = document.createElement('a');
-    // link.setAttribute('href', `http://localhost:3000/${filePath}`);
-    // link.setAttribute('download', '');
-    // link.click();
 
     function utf8_to_b64(str) {
         return window.btoa(unescape(encodeURIComponent(str)));
     }
 }
 
-async function test() {
+function load() {
+    const input = document.getElementById(ID.fileChooser);
 
-    const input = document.getElementById('ff');
 
-    console.log(input.value);
-    console.log(input.files[0]);
+    const reader = new FileReader();
 
-    let reader = new FileReader();
-
-    reader.readAsText(input.files[0]);
-
-    reader.onload = function () {
+    reader.onload = () => {
         const data = JSON.parse(reader.result);
-            
+
         fields.clear();
         currentTitle = Object.keys(data)[0];
         currentSubtitle = 0;
         currentData = data;
 
-        Object.keys(currentData[currentTitle][currentSubtitle]).forEach(key => fields.set(key, key));
+        Object.entries(currentData[currentTitle][currentSubtitle]).forEach((key) => fields.set(key[0], typeof key[1]));
 
         updateTitles();
-    };
-
-    reader.onerror = function () {
-        console.log(reader.error);
-    };
+    }
+    reader.onerror = () => console.error(reader.error);
+    
+    reader.readAsText(input.files[0]);
 }
 
+async function logIn() {
+    const resGetUserData = await fetch('http://localhost:3000/login');
+    
+    const resData = await resGetUserData.json();
+    if (resData.isAuth) return;
 
+    const formLogin = document.forms['formLogin'];
 
-async function load(fileName) {
-    if (!fileName) throw new Error('fileName is invalid');
+    if (!formLogin) {
+        goToPage('login');
+        return;
+    }
 
-    const response = await fetch(`http://localhost:3000/files/${fileName}.json`, {
+    const data = {
+        login: formLogin.login,
+        password: formLogin.password
+    }
+
+    console.log(data);
+
+    await fetch('http://localhost:3000/login',
+    {
+        method: 'POST', 
         headers: {
             'Content-Type': 'application/json;charset=utf-8'
-        }
+        },
+        body: JSON.stringify(data)
     });
-    const data = await response.json();
-
-    fields.clear();
-    currentTitle = Object.keys(data)[0];
-    currentSubtitle = 0;
-    currentData = data;
-
-    Object.keys(currentData[currentTitle][currentSubtitle]).forEach(key => fields.set(key, key));
-
-    updateTitles();
 }
 
+async function logOut() {
+    await fetch('http://localhost:3000/logout');
+    goToPage('login');
+}
 
 function createWindow(windowType, isChangeValues, objectField) {
     const container = document.getElementById(ID.container);
@@ -165,16 +151,15 @@ function createWindow(windowType, isChangeValues, objectField) {
 
     function createSubtitle() {
         fields.forEach((value, key) => {
-            const field = currentData[currentTitle][currentSubtitle][value];
-
-            if (typeof field === 'object') {
-                const button = createButton(key, () => createWindow(windows.objectEdit, isChangeValues, value));
+            if (value === 'object') {
+                const button = createButton(key, () => createWindow(windows.objectEdit, isChangeValues, key));
                 divContainer.append(button);
 
                 return;
             }
 
-            const input = createInput(value, `dynamic__${key}`, isChangeValues ? field : '');
+
+            const input = createInput(key, `dynamic__${key}`, isChangeValues ? currentData[currentTitle][currentSubtitle][key] : '');
             divContainer.append(input);
         });
 
@@ -188,6 +173,11 @@ function createWindow(windowType, isChangeValues, objectField) {
         divContainer.append(input);
 
 
+        const buttonCreateObject = createButton('Объект', () => {
+            createWindow(windows.objectEdit, false, input.value);
+        });
+        divWindow.append(buttonCreateObject);
+
         const buttonApply = createButton('Принять', () => addField());
         divWindow.append(buttonApply);
     }
@@ -198,7 +188,7 @@ function createWindow(windowType, isChangeValues, objectField) {
         buttonCancel.id = 'editCancel';
 
         fields.forEach((value, key) => {
-            const button = createButton(value, () => {
+            const button = createButton(key, () => {
                 subtitleForEach(direction => delete direction[key]);
 
                 fields.delete(key);
@@ -218,14 +208,21 @@ function createWindow(windowType, isChangeValues, objectField) {
     function createObjectEdit() {
         const object = currentData[currentTitle][currentSubtitle][objectField];
 
-        for (const [key, value] of Object.entries(object)) {
-            const input = createInput(key, `dynamic__${key}`, value);
-            divContainer.append(input);
+        if (isChangeValues) {
+            for (const [key, value] of Object.entries(object)) {
+                const input = createInput(key, `dynamic__${key}`, value);
+                divContainer.append(input);
+            }
+        } else {
+            const buttonCreateField = createButton('Создать поле', () => {
+                createWindow(windows.fieldAdd);
+            });
+            divWindow.append(buttonCreateField);
         }
 
         const buttonApply = createButton('Принять', () => {
             Object.keys(object).forEach(key =>
-                currentData[currentTitle][currentSubtitle][objectField][key] = +document.getElementById(`dynamic__${key}`).value
+                currentData[currentTitle][currentSubtitle][objectField][key] = convertToNumber(document.getElementById(`dynamic__${key}`).value)
             );
 
             deleteWindow(windows.objectEdit);
@@ -264,8 +261,7 @@ function updateSubtitleData() {
 
     currentSubtitle = selectSubtitle.value;
 
-
-    fields.forEach(key => {
+    fields.forEach((value, key) => {
         const li = document.createElement('li');
         li.innerHTML = `<b>${key}</b>: `;
 
@@ -276,11 +272,10 @@ function updateSubtitleData() {
 
 
     function handleData(data, liOuter) {
-        if (!liOuter instanceof HTMLLIElement) throw new Error('parameter \"li\" is wrong type');
         if (!data) return;
 
         if (typeof data == 'string' || typeof data == 'number')
-            liOuter.innerHTML += convertToHref(data);
+            liOuter.innerHTML += convertToAny(data);
         else {
             const ulInner = document.createElement('ul');
             liOuter.append(ulInner);
@@ -289,9 +284,10 @@ function updateSubtitleData() {
                 for (const [key, value] of Object.entries(data)) {
                     const liInner = document.createElement('li');
                     liInner.innerHTML = `<b>${key}</b>: `;
+                    
                     ulInner.append(liInner);
 
-                    if (typeof value !== 'object') liInner.innerHTML += convertToHref(value);
+                    if (typeof value !== 'object') liInner.innerHTML += convertToAny(value);
                     else handleData(value, liInner);
                 }
             } else {
@@ -300,9 +296,11 @@ function updateSubtitleData() {
 
                     const liInner = document.createElement('li');
                     liInner.innerHTML = emptySpace;
+
+                    ulInner.type = 'none';
                     ulInner.append(liInner);
 
-                    if (typeof value !== 'object') liInner.innerHTML = convertToHref(value);
+                    if (typeof value !== 'object') liInner.innerHTML = convertToAny(value);
                     else handleData(value, liInner);
                 }
             }
@@ -343,7 +341,7 @@ function addOrEditSubtitle(subtitleIndex, isEditSubtitle) {
         const input = document.getElementById(`dynamic__${key}`);
         if (!input) return;
 
-        currentData[currentTitle][subtitleIndex][value] = convertToNumber(input.value);
+        currentData[currentTitle][subtitleIndex][key] = convertToNumber(input.value);
     });
 
     currentSubtitle = subtitleIndex;
@@ -371,7 +369,7 @@ function addField() {
 
     const newField = input.value;
 
-    fields.set(newField, newField);
+    fields.set(newField, typeof newField);
 
     subtitleForEach(direction => direction[newField] = '');
 
@@ -381,6 +379,11 @@ function addField() {
 }
 
 //#region Help functions
+
+function goToPage(page = 'index') {
+    const path = location.origin + `/${page}.html`;
+    if (location.href != path) location.href = path;
+}
 
 function subtitleForEach(action) {
     Object.keys(currentData).forEach(title =>
@@ -447,12 +450,18 @@ function createInput(placeholder, id, value = '', type = 'text') {
 
 
 function convertToNumber(value) {
-    if (!isNaN(+value)) return +value;
+    if (value && !isNaN(+value)) value = `<i>${value}</i>`;
     return value;
 }
 
 
 function convertToHref(value) {
     if (typeof value == 'string' && value.includes('http')) value = `<a href='${value}'>${value}</a>`;
+    return value;
+}
+
+function convertToAny(value) {
+    value = convertToHref(value);
+    value = convertToNumber(value);
     return value;
 }

@@ -12,8 +12,8 @@ app.use(body.urlencoded());
 let f = true;
 
 const d = {
-  login: 'oleg',
-  password: 'hui'
+  login: 'polytech',
+  password: '2021year'
 }
 
 app.get('/login', (req, res) => {

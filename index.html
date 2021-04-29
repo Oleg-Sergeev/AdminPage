@@ -7,21 +7,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Админка</title>
     <link rel="stylesheet" type="text/css" href="styles.css">
-    <script src="front.mjs"></script>
+    <script src="front.js"></script>
 </head>
 
-<body>
+<body onload="logIn()">
     <div id="container">
         <div>
-                <p>
-                    <input type="file" id='ff'>
-                    <button onclick="test()">Отправить</button>
-                </p>
-            <select id="fileChooser" onchange="load(value)">
-                <option value="directions">Информация по направлениям</option>
-                <option value="questions">Вопросы</option>
-                <option value="hostels">Общежития</option>
-            </select>
+            <input type="file" id='fileChooser'>
+            <button onclick="load()">Отправить</button>
         </div>
         <div id='titleContainer'>
             <div class='buttons'>
@@ -59,12 +52,12 @@
                         </button>
                     </div>
                     <ul id='subtitleData'>
-                        <li>ЗначениеТест</li>
                     </ul>
                 </div>
             </div>
-            <button onclick="save(document.getElementById('fileChooser').value)">Сохранить</button>
+            <button onclick="save()">Сохранить</button>
         </div>
+        <button onclick="logOut()">Выйти</button>
     </div>
 </body>
 

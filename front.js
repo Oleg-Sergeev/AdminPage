@@ -10,7 +10,11 @@ const ID = {
     inputs: {
         titleName: 'titleInput',
         fieldName: 'fieldInput'
-    }
+    },
+    selectStudyForm : 'studyForm',
+    selectStudyDegree : 'studyDegree',
+    selectDirection : 'direction',
+    selectSpecialty : 'specialty'
 };
 
 const windows = {
@@ -19,12 +23,25 @@ const windows = {
     fieldAdd: 'field_add',
     fieldEdit: 'field_edit',
     fieldDelete: 'field_delete',
-    objectEdit: 'object_edit'
+    objectEdit: 'object_edit',
+
+    studyForm: 'studyForm_',
+    studyDegree: 'studyDegree_',
+    direction: 'direction_',
+    speciality: 'speciality_'
 };
 
 let currentTitle = '';
 let currentSubtitle = -1;
-let currentData = {}
+let currentData = {};
+
+let currentStudyForm = '';
+let currentStudyDegree = '';
+let currentDirection = '';
+let currentDirectionIndex = 0;
+
+const containers = [];
+
 
 
 function save() {
@@ -55,52 +72,85 @@ function load() {
         const data = JSON.parse(reader.result);
 
         fields.clear();
-        currentTitle = Object.keys(data)[0];
-        currentSubtitle = 0;
         currentData = data;
 
-        Object.entries(currentData[currentTitle][currentSubtitle]).forEach((key) => fields.set(key[0], typeof key[1]));
-
-        updateTitles();
+        parseJSON();
     }
     reader.onerror = () => console.error(reader.error);
     
     reader.readAsText(input.files[0]);
 }
 
+
+function addSelection(selectId, windowName, removeWindowFunc, onSelectionChange) {
+    const divSubtitleContainer = document.createElement('div'); divSubtitleContainer.className = 'subtitleContainer';
+    const select = document.createElement('select'); select.id = selectId; select.onchange = onSelectionChange;
+
+    const divButtons = document.createElement('div'); divButtons.className = 'buttons';
+    divButtons.append(createButton('Добавить', () => createWindow(windowName)));
+    divButtons.append(createButton('Редактировать', () => createWindow(windowName, true)));
+    divButtons.append(createButton('Удалить',() => removeWindowFunc()));
+
+    divSubtitleContainer.append(divButtons);
+    divSubtitleContainer.append(select);
+
+    const lastContainer = document.getElementsByClassName('subtitleContainer');
+
+    if (lastContainer.length) lastContainer[lastContainer.length - 1].after(divSubtitleContainer);
+    else document.getElementById('titleContainer').prepend(divSubtitleContainer);
+
+    containers.push(divSubtitleContainer);
+}
+
+function removeElements(elements) {
+    for (let i = elements.length - 1; i >= 0; i--) {
+        elements[i].remove();
+        elements.splice(-1, 1);
+    }
+}
+
 async function logIn() {
-    const resGetUserData = await fetch('http://localhost:3000/login');
+    try {
+        const resGetUserData = await fetch('http://localhost:3000/login');
+        
+        const resData = await resGetUserData.json();
+        if (resData.isAuth) return;
     
-    const resData = await resGetUserData.json();
-    if (resData.isAuth) return;
-
-    const formLogin = document.forms['formLogin'];
-
-    if (!formLogin) {
-        goToPage('login');
-        return;
+        const formLogin = document.forms['formLogin'];
+    
+        if (!formLogin) {
+            goToPage('login');
+            return;
+        }
+    
+        const data = {
+            login: formLogin.login,
+            password: formLogin.password
+        }
+    
+        console.log(data);
+    
+        await fetch('http://localhost:3000/login',
+        {
+            method: 'POST', 
+            headers: {
+                'Content-Type': 'application/json;charset=utf-8'
+            },
+            body: JSON.stringify(data)
+        });
     }
-
-    const data = {
-        login: formLogin.login,
-        password: formLogin.password
+    catch(error) {
+        console.error('No connection with server');
     }
-
-    console.log(data);
-
-    await fetch('http://localhost:3000/login',
-    {
-        method: 'POST', 
-        headers: {
-            'Content-Type': 'application/json;charset=utf-8'
-        },
-        body: JSON.stringify(data)
-    });
 }
 
 async function logOut() {
-    await fetch('http://localhost:3000/logout');
-    goToPage('login');
+    try {
+        await fetch('http://localhost:3000/logout');
+        goToPage('login');
+    } catch (error) {
+        console.error('No connection');
+    }
 }
 
 function createWindow(windowType, isChangeValues, objectField) {
@@ -133,6 +183,18 @@ function createWindow(windowType, isChangeValues, objectField) {
             break;
         case windows.objectEdit:
             createObjectEdit();
+            break;
+        case windows.studyForm:
+            createStudyForm();
+            break;
+        case windows.studyDegree:
+            createStudyDegree();
+            break;
+        case windows.direction:
+            createDirection();
+            break;
+        case windows.speciality:
+            createSpeciality();
             break;
         default:
             return;
@@ -232,6 +294,64 @@ function createWindow(windowType, isChangeValues, objectField) {
 
         divWindow.append(buttonApply);
     }
+
+
+
+
+    function createStudyForm() {
+        const input = createInput('Название', ID.inputs.titleName, isChangeValues ? currentStudyForm : '');
+        divContainer.append(input);
+
+
+        const buttonApply = createButton('Принять', () => addOrEditStudyForm(isChangeValues));
+        divWindow.append(buttonApply);
+    }
+
+    function createStudyDegree() {
+        const input = createInput('Название', ID.inputs.titleName, isChangeValues ? currentStudyDegree : '');
+        divContainer.append(input);
+
+
+        const buttonApply = createButton('Принять', () => addOrEditStudyDegree(isChangeValues));
+        divWindow.append(buttonApply);
+    }
+
+    function createDirection() {
+        const input = createInput('Название', ID.inputs.titleName, isChangeValues ? currentDirection : '');
+        divContainer.append(input);
+
+
+        const buttonApply = createButton('Принять', () => addOrEditDirection(isChangeValues));
+        divWindow.append(buttonApply);
+    }
+
+    function createSpeciality() {
+        fields.forEach((value, key) => {
+            if (value === 'object') {
+                const button = createButton(key, () => createWindow(windows.objectEdit, isChangeValues, key));
+                divContainer.append(button);
+
+                return;
+            }
+
+
+            const input = createInput(
+                key, 
+                `dynamic__${key}`, 
+                isChangeValues ? currentData[currentStudyForm][currentStudyDegree][currentDirection][currentDirectionIndex][key] : '');
+            divContainer.append(input);
+        });
+
+
+        const buttonApply = createButton(
+            'Принять',
+             () => addOrEditSpecialities(
+                 isChangeValues 
+                 ? currentDirectionIndex 
+                 : Object.keys(currentData[currentStudyForm][currentStudyDegree][currentDirection]).length,
+                  isChangeValues));
+        divWindow.append(buttonApply);
+    }
 }
 
 function deleteWindow(windowID) {
@@ -269,44 +389,154 @@ function updateSubtitleData() {
 
         ul.append(li);
     });
+}
 
 
-    function handleData(data, liOuter) {
-        if (!data) return;
+function handleData(data, liOuter) {
+    if (!data) return;
+    if (typeof data == 'string' || typeof data == 'number')
+        liOuter.innerHTML += convertToAny(data);
+    else {
+        const ulInner = document.createElement('ul');
+        liOuter.append(ulInner);
 
-        if (typeof data == 'string' || typeof data == 'number')
-            liOuter.innerHTML += convertToAny(data);
-        else {
-            const ulInner = document.createElement('ul');
-            liOuter.append(ulInner);
+        if (!Array.isArray(data)) {
+            for (const [key, value] of Object.entries(data)) {
+                const liInner = document.createElement('li');
+                liInner.innerHTML = `<b>${key}</b>: `;
+                
+                ulInner.append(liInner);
 
-            if (!Array.isArray(data)) {
-                for (const [key, value] of Object.entries(data)) {
-                    const liInner = document.createElement('li');
-                    liInner.innerHTML = `<b>${key}</b>: `;
-                    
-                    ulInner.append(liInner);
+                if (typeof value !== 'object') liInner.innerHTML += convertToAny(value);
+                else handleData(value, liInner);
+            }
+        } else {
+            for (const value of Object.values(data)) {
+                const emptySpace = '&#160;';
+                const liInner = document.createElement('li');
+                liInner.innerHTML = emptySpace;
 
-                    if (typeof value !== 'object') liInner.innerHTML += convertToAny(value);
-                    else handleData(value, liInner);
-                }
-            } else {
-                for (const value of Object.values(data)) {
-                    const emptySpace = '&#160;';
+                ulInner.type = 'none';
+                ulInner.append(liInner);
 
-                    const liInner = document.createElement('li');
-                    liInner.innerHTML = emptySpace;
-
-                    ulInner.type = 'none';
-                    ulInner.append(liInner);
-
-                    if (typeof value !== 'object') liInner.innerHTML = convertToAny(value);
-                    else handleData(value, liInner);
-                }
+                if (typeof value !== 'object') liInner.innerHTML = convertToAny(value);
+                else handleData(value, liInner);
             }
         }
     }
 }
+
+
+
+function addOrEditStudyForm(isEditTitle) {
+    const input = document.getElementById(ID.inputs.titleName);
+
+    if (!isEditTitle) 
+        currentData[input.value] = {};
+    else delete Object.assign(currentData, {
+        [input.value]: currentData[currentStudyForm]
+    })[currentStudyForm];
+
+    currentStudyForm = input.value;
+
+    updateForms();
+
+    deleteWindow(windows.studyForm);
+}
+
+function removeStudyForm() {
+    const selectStudyForm = document.getElementById(ID.selectStudyForm);
+
+    delete(currentData[selectStudyForm.value]);
+
+    currentStudyForm = Object.keys(currentData)[0] ?? '';
+
+    updateForms();
+}
+
+
+function addOrEditStudyDegree(isEditTitle) {
+    const input = document.getElementById(ID.inputs.titleName);
+
+    if (!isEditTitle) currentData[currentStudyForm][input.value] = {};
+    else delete Object.assign(currentData[currentStudyForm], {
+        [input.value]: currentData[currentStudyForm][currentStudyDegree]
+    })[currentStudyDegree];
+
+    currentStudyDegree = input.value;
+
+    updateStudyDegrees();
+
+    deleteWindow(windows.studyDegree);
+}
+
+function removeStudyDegree() {
+    const selectStudyDegree = document.getElementById(ID.selectStudyDegree);
+
+    delete(currentData[currentStudyForm][selectStudyDegree.value]);
+
+    currentStudyDegree = Object.keys(currentData[currentStudyForm])[0] ?? '';
+
+    updateForms();
+}
+
+
+function addOrEditDirection(isEditTitle) {
+    const input = document.getElementById(ID.inputs.titleName);
+
+    if (!isEditTitle) currentData[currentStudyForm][currentStudyDegree][input.value] = [];
+    else delete Object.assign(currentData[currentStudyForm][currentStudyDegree], {
+        [input.value]: currentData[currentStudyForm][currentStudyDegree][currentDirection]
+    })[currentDirection];
+
+    currentDirection = input.value;
+
+    updateDirections();
+
+    deleteWindow(windows.direction);
+}
+
+function removeDirection() {
+    const selectTitle = document.getElementById(ID.selectDirection);
+
+    delete(currentData[currentStudyForm][currentStudyDegree][selectTitle.value]);
+
+    currentDirection = Object.keys(currentData[currentStudyForm][currentStudyDegree])[0] ?? '';
+
+    updateForms();
+}
+
+function addOrEditSpecialities(subtitleIndex, isEditSubtitle) {
+    if (!isEditSubtitle) currentData[currentStudyForm][currentStudyDegree][currentDirection][subtitleIndex] = {}
+
+    fields.forEach((value, key) => {
+        const input = document.getElementById(`dynamic__${key}`);
+        if (!input) return;
+
+        currentData[currentStudyForm][currentStudyDegree][currentDirection][subtitleIndex][key] = convertToNumber(input.value);
+    });
+
+    currentDirectionIndex = subtitleIndex;
+
+    updateSpecialities();
+
+    deleteWindow(windows.speciality);
+}
+
+function removeSpecialities() {
+    const selectSpecialty = document.getElementById(ID.selectSpecialty);
+
+    if (!currentData[currentStudyForm][currentStudyDegree][currentDirection][selectSpecialty.value]) return;
+
+    currentData[currentStudyForm][currentStudyDegree][currentDirection].splice(currentDirectionIndex, 1);
+
+    if (--currentDirectionIndex < 0) currentDirectionIndex = 0;
+
+    updateForms();
+}
+
+
+
 
 function addOrEditTitle(isEditTitle) {
     const input = document.getElementById(ID.inputs.titleName);
@@ -332,6 +562,7 @@ function removeTitle() {
 
     updateTitles();
 }
+
 
 
 function addOrEditSubtitle(subtitleIndex, isEditSubtitle) {
@@ -362,6 +593,8 @@ function removeSubtitle() {
 
     updateTitles();
 }
+
+
 
 
 function addField() {
@@ -415,8 +648,15 @@ function updateSubtitles() {
     currentData[currentTitle].forEach((title, i) => {
         if (!Object.keys(title).length) return;
 
+        const option =  title[fields.keys().next().value];
+        let innerHTML = option;
+
+        if (typeof option != 'string') {
+            innerHTML = Object.keys(option)[0];
+        }
+
         const optionSubtitle = document.createElement('option');
-        optionSubtitle.innerHTML = title[fields.keys().next().value];
+        optionSubtitle.innerHTML = innerHTML;
         optionSubtitle.value = i;
 
         selectSubtitle.append(optionSubtitle);
@@ -464,4 +704,198 @@ function convertToAny(value) {
     value = convertToHref(value);
     value = convertToNumber(value);
     return value;
+}
+
+
+
+function parseJSON() {
+    if (containers.length == 2) {
+        currentTitle = Object.keys(currentData)[0];
+        currentSubtitle = 0;
+        Object.entries(currentData[currentTitle][currentSubtitle]).forEach((key) => fields.set(key[0], typeof key[1]));
+
+        updateTitles();
+    }
+    else if (containers.length == 4){
+        currentStudyForm = Object.keys(currentData)[0];
+        currentStudyDegree = Object.keys(currentData[currentStudyForm])[0];
+        currentDirection = Object.keys(currentData[currentStudyForm][currentStudyDegree])[0];
+        currentDirectionIndex = 0;
+        Object.entries(currentData[currentStudyForm][currentStudyDegree][currentDirection][0]).forEach((key) => fields.set(key[0], typeof key[1]));
+
+        updateForms();
+    }
+    else console.error('wrong', containers.length);
+}
+
+
+
+function selectJSONParser(value) {
+    switch (value) {
+        case 'directions':
+            addDirectionsJSONParser();
+            break;
+
+        default:
+            addOtherJSONParser();
+            break;
+    }
+}
+
+
+function addOtherJSONParser() {
+    removeElements(containers);
+
+    addSelection('titleName', 'title', removeTitle, updateTitleData);
+    addSelection('subtitleName', 'subtitle', removeSubtitle, updateSubtitleData);
+}
+
+function addDirectionsJSONParser() {
+    removeElements(containers);
+
+    addSelection('studyForm', windows.studyForm, removeStudyForm, updateStudyFormData);
+    addSelection('studyDegree', windows.studyDegree, removeStudyDegree, updateStudyDegreeData);
+    addSelection('direction', windows.direction, removeDirection, updateDirectionData);
+    addSelection('specialty', windows.speciality, removeSpecialities, updateSpecialityData);
+}
+
+
+
+
+
+function updateStudyFormData() {
+    const selectStudyForm = document.getElementById(ID.selectStudyForm);
+
+    currentStudyForm = selectStudyForm.value;
+
+    currentStudyDegree = Object.keys(currentData[currentStudyForm])[0];
+    currentDirection = Object.keys(currentData[currentStudyForm][currentStudyDegree])[0];
+    currentDirectionIndex = 0;
+
+    updateStudyDegrees();
+}
+
+function updateForms() {
+    const selectStudyForm = document.getElementById(ID.selectStudyForm);
+    selectStudyForm.innerHTML = '';
+
+    Object.keys(currentData).forEach(title => {
+        const optionTitle = document.createElement('option');
+        optionTitle.innerHTML = title;
+        selectStudyForm.append(optionTitle);
+    });
+
+    selectStudyForm.value = currentStudyForm;
+
+    updateStudyDegrees();
+}
+
+
+function updateStudyDegreeData() {
+    const selectStudyDegree = document.getElementById(ID.selectStudyDegree);
+
+    currentStudyDegree = selectStudyDegree.value;
+
+    currentDirection = Object.keys(currentData[currentStudyForm][currentStudyDegree])[0];
+    currentDirectionIndex = 0;
+
+    updateDirections();
+}
+
+function updateStudyDegrees() {
+    const selectStudyDegree = document.getElementById(ID.selectStudyDegree);
+    selectStudyDegree.innerHTML = '';
+
+    Object.keys(currentData[currentStudyForm]).forEach(title => {
+        const optionTitle = document.createElement('option');
+        optionTitle.innerHTML = title;
+        selectStudyDegree.append(optionTitle);
+    });
+
+    selectStudyDegree.value = currentStudyDegree;
+
+    updateDirections();
+}
+
+
+function updateDirectionData() {
+    const selectDirection = document.getElementById(ID.selectDirection);
+
+    currentDirection = selectDirection.value;
+
+    currentDirectionIndex = 0;
+
+    updateSpecialities();
+}
+
+function updateDirections() {
+    const selectDirection = document.getElementById(ID.selectDirection);
+    selectDirection.innerHTML = '';
+
+    if (!currentData[currentStudyForm][currentStudyDegree]) {
+        updateSpecialities();
+        return;
+    }
+
+    Object.keys(currentData[currentStudyForm][currentStudyDegree]).forEach(title => {
+        const optionTitle = document.createElement('option');
+        optionTitle.innerHTML = title;
+        selectDirection.append(optionTitle);
+    });
+
+    selectDirection.value = currentDirection;
+
+    updateSpecialities();
+}
+
+
+function updateSpecialityData() {
+    const selectSpecialty = document.getElementById(ID.selectSpecialty);
+
+    const ul = document.getElementById(ID.ulSubtitleData);
+    ul.innerHTML = '';
+
+    if (!selectSpecialty.value) return;
+
+    currentDirectionIndex = selectSpecialty.value;
+
+    fields.forEach((value, key) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<b>${key}</b>: `;
+
+        handleData(currentData[currentStudyForm][currentStudyDegree][currentDirection][currentDirectionIndex][key], li);
+
+        ul.append(li);
+    });
+}
+
+function updateSpecialities() {
+    const selectSpecialty = document.getElementById(ID.selectSpecialty);
+    selectSpecialty.innerHTML = '';
+
+    if (!currentData[currentStudyForm][currentStudyDegree] || !currentData[currentStudyForm][currentStudyDegree][currentDirection]){
+        updateSpecialityData();
+        return;
+    }
+
+    currentData[currentStudyForm][currentStudyDegree][currentDirection].forEach((title, i) => {
+        if (!Object.keys(title).length) return;
+
+        const option =  title[fields.keys().next().value];
+        let innerHTML = option;
+
+        if (typeof option != 'string') {
+            innerHTML = Object.keys(option)[0];
+        }
+
+        const optionSubtitle = document.createElement('option');
+        optionSubtitle.innerHTML = innerHTML;
+        optionSubtitle.value = i;
+
+        selectSpecialty.append(optionSubtitle);
+    });
+
+    selectSpecialty.value = currentDirectionIndex;
+
+    updateSpecialityData();
 }
